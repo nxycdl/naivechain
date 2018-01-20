@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>节点</title>
+    <script src="https://cdn.bootcss.com/vue/2.4.1/vue.min.js"></script>
+    <script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdn.bootcss.com/axios/0.16.2/axios.min.js"></script>
+</head>
+<body>
+<div id="app">
+    <div>
+        <input type="text" name="" id="host" v-model="host">
+        <input type="text" name="" id="port" v-model="port">
+        <input type="button" value="加入节点" @click="addPeer">
+
+        <input type="text" name="" v-model="minerText">
+        <input type="button" value="开始挖矿" @click="mineBlock">
+    </div>
+    <div style="height: 20px">
+        <p style="color:red">{{notify}}</p>
+    </div>
+    <div>
+        <ol>
+            <li v-for="message in messageList">
+                {{ message.type }}{{ message.data[0]}}
+            </li>
+        </ol>
+    </div>
+</div>
+</body>
+<script>
+    let vm = new Vue({
+            el: '#app',
+            data: {
+                host: '127.0.0.1',
+                port: '6001',
+                minerText: '挖矿来吧',
+                notify: '   ',
+                messageList: []
+            },
+            methods: {
+                addPeer(){
+                    console.log('加入节点！', vm.host, vm.port);
+                    startNewSocket(vm.host, vm.port);
+                },
+                mineBlock(){
+                    const data = {data: vm.minerText};
+                    console.log(data);
+                    axios.post('/mineBlock', data, {headers: {"Content-Type": "application/json"}})
+                        .then(function (response) {
+                            //console.log(response);
+                            if (response.status === 200) {
+                                vm.notify = '挖矿成功';
+                                setTimeout(() => {
+                                    vm.notify = ' ';
+                                }, 2000)
+                            }
+                        })
+                        .catch(function (error) {
+                            console.log(error);
+                            vm.seen = true;
+                            vm.notify = error;
+                            setTimeout(() => {
+                                vm.notify = ' ';
+                            }, 2000)
+                        });
+                }
+
+            }
+            ,
+            created()
+            {
+                console.log('created()');
+            }
+        })
+    ;
+    var ws;
+    function startNewSocket(host, port) {
+        ws = new WebSocket(`ws://${host}:${port}`);
+        ws.onopen = (env) => onOpen(env);
+        ws.onmessage = (env) => onMessage(env);
+        ws.onclose = (env) => onClose(env);
+    }
+
+    function onOpen(evt) {
+        console.log('OnOpen')
+    }
+
+    function onMessage(evt) {
+        console.log("数据已接收...", evt);
+        var received_msg = {
+            type: 0,
+            data: [{
+                index: 0,
+                previousHash: 0,
+                timestamp: 0,
+            }]
+        }
+        const data = JSON.parse(evt.data);
+        data.data = JSON.parse(data.data);
+
+        received_msg = Object.assign(received_msg, data);
+        vm.messageList.unshift(data);
+
+    }
+
+    function onClose(env) {
+        console.log("连接已关闭...");
+    }
+</script>
+</html>

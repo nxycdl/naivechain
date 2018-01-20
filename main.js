@@ -6,7 +6,8 @@ var WebSocket = require("ws");
 
 var http_port = process.env.HTTP_PORT || 3001;
 var p2p_port = process.env.P2P_PORT || 6001;
-var initialPeers = process.env.PEERS ? process.env.PEERS.split(',') : [];
+// var initialPeers = process.env.PEERS ? process.env.PEERS.split(',') : [];
+var initialPeers = ['ws://localhost:6001'];
 
 class Block {
     constructor(index, previousHash, timestamp, data, hash) {
@@ -34,6 +35,9 @@ var blockchain = [getGenesisBlock()];
 var initHttpServer = () => {
     var app = express();
     app.use(bodyParser.json());
+    app.set("view engine", 'ejs');
+    //指定模板位置
+    app.set('views', __dirname + '/views');
 
     app.get('/blocks', (req, res) => res.send(JSON.stringify(blockchain)));
     app.post('/mineBlock', (req, res) => {
@@ -50,6 +54,10 @@ var initHttpServer = () => {
         connectToPeers([req.body.peer]);
         res.send();
     });
+
+    app.get('/', (req, res) => {
+        res.render('peers.ejs')
+    })
     app.listen(http_port, () => console.log('Listening http on port: ' + http_port));
 };
 
@@ -65,7 +73,10 @@ var initConnection = (ws) => {
     sockets.push(ws);
     initMessageHandler(ws);
     initErrorHandler(ws);
-    write(ws, queryChainLengthMsg());
+
+    console.log('发送消息');
+    ws.send(JSON.stringify({'type': MessageType.QUERY_LATEST}));
+    //write(ws, queryChainLengthMsg());
 };
 
 var initMessageHandler = (ws) => {
@@ -135,6 +146,7 @@ var isValidNewBlock = (newBlock, previousBlock) => {
 };
 
 var connectToPeers = (newPeers) => {
+    console.log('connectToPeers', newPeers);
     newPeers.forEach((peer) => {
         var ws = new WebSocket(peer);
         ws.on('open', () => initConnection(ws));
@@ -194,7 +206,7 @@ var isValidChain = (blockchainToValidate) => {
 var getLatestBlock = () => blockchain[blockchain.length - 1];
 var queryChainLengthMsg = () => ({'type': MessageType.QUERY_LATEST});
 var queryAllMsg = () => ({'type': MessageType.QUERY_ALL});
-var responseChainMsg = () =>({
+var responseChainMsg = () => ({
     'type': MessageType.RESPONSE_BLOCKCHAIN, 'data': JSON.stringify(blockchain)
 });
 var responseLatestMsg = () => ({
